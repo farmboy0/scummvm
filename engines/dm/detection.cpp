@@ -49,6 +49,20 @@ static const DMADGameDescription gameDescriptions[] = {
 		{ kDMSavePlatformAcceptAny}
 	},
 	{
+		{"dm", "DOS v??? English",
+			{
+				{"graphics.dat", 0, "c0cee1d0f9ee9946f955999a66b54eb5", 363417},
+				{"Dungeon.dat", 0, "ebfc4019b67e66da41a20224c8a3f0c3", 33357},
+				AD_LISTEND
+			},
+			Common::EN_ANY, Common::kPlatformDOS, ADGF_NO_FLAGS, GUIO1(GUIO_NONE)
+		},
+	    kDMSaveTargetDM21, kDMSaveFormatAmigaPC98FmTowns, kDMSavePlatformPC,
+		{ kDMSaveTargetDM21, kDMSaveTargetEndOfList },
+		{ kDMSaveFormatAmigaPC98FmTowns, kDMSaveFormatEndOfList},
+		{ kDMSavePlatformAcceptAny}
+	},
+	{
 		{"dm", "Atari v??? English",
 			AD_ENTRY2s("graphics.dat",	"6ffff2a17e2df0effa9a12fb4b1bf6b6", 271911,
 					   "Dungeon.dat",	"be9468b460515741babec9a70501e2e9", 33286),
