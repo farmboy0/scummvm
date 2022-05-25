@@ -21,16 +21,34 @@
 #ifndef GRAPHICS_SCALER_XBRZ_H
 #define GRAPHICS_SCALER_XBRZ_H
 
+#define FORBIDDEN_SYMBOL_EXCEPTION_asctime
+#define FORBIDDEN_SYMBOL_EXCEPTION_clock
+#define FORBIDDEN_SYMBOL_EXCEPTION_ctime
+#define FORBIDDEN_SYMBOL_EXCEPTION_difftime
+#define FORBIDDEN_SYMBOL_EXCEPTION_getdate
+#define FORBIDDEN_SYMBOL_EXCEPTION_gmtime
+#define FORBIDDEN_SYMBOL_EXCEPTION_localtime
+#define FORBIDDEN_SYMBOL_EXCEPTION_mktime
+#define FORBIDDEN_SYMBOL_EXCEPTION_time
+#define FORBIDDEN_SYMBOL_EXCEPTION_FILE
+
 #include "graphics/scalerplugin.h"
+#include "graphics/scaler/ctpl/ctpl_stl.h"
 
 class xBRZScaler : public Scaler {
 public:
-	xBRZScaler(const Graphics::PixelFormat &format) : Scaler(format) { _factor = 1; }
+	xBRZScaler(const Graphics::PixelFormat &format, int nThreads) : Scaler(format), _tpool(nThreads), _nThreads(nThreads)
+	{
+		_factor = 1;
+	}
 	uint increaseFactor() override;
 	uint decreaseFactor() override;
 protected:
 	virtual void scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 							uint8 *dstPtr, uint32 dstPitch, int width, int height, int x, int y) override;
+private:
+	ctpl::thread_pool _tpool;
+	int _nThreads;
 };
 
 

@@ -19,6 +19,8 @@
  */
 
 #include <cstring>
+#include <future>
+#include <vector>
 
 #include "graphics/scaler/xbrz.h"
 #include "graphics/scaler/xbrz/xbrz.h"
@@ -52,7 +54,29 @@ void xBRZScaler::scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 		dst = (uint32_t *)malloc(dstWidthInByte * dstLineCount);
 	}
 
-	xbrz::scale(_factor, src, dst, srcWidth, srcLineCount, xbrz::ColorFormat::ARGB, cfg, 0, srcLineCount);
+	int linesPerThread = srcLineCount / _nThreads;
+	if (linesPerThread < 8)
+		linesPerThread = 8;
+
+	std::vector<std::future<void>> futures;
+
+	int scaleStart = 0;
+	while(scaleStart < srcLineCount) {
+		int scaleEnd = scaleStart + linesPerThread;
+		auto future = _tpool.push(
+				[=](int threadId) {
+					xbrz::scale(_factor, src, dst, srcWidth, srcLineCount,
+							xbrz::ColorFormat::ARGB, cfg, scaleStart, scaleEnd);
+				}
+		);
+		futures.emplace_back(std::move(future));
+		scaleStart = scaleEnd;
+	}
+
+	Common::for_each(futures.begin(), futures.end(),
+			[](std::future<void>& future) {
+				future.get();
+			});
 
 	if (dstPitch > dstWidthInByte) {
 		uint8 *tmp = dstPtr;
@@ -83,16 +107,12 @@ uint xBRZScaler::decreaseFactor() {
 }
 
 
-class xBRZPlugin final : public ScalerPluginObject {
+class xBRZPlugin : public ScalerPluginObject {
 public:
 	xBRZPlugin();
 
-	Scaler *createInstance(const Graphics::PixelFormat &format) const override;
-
 	bool canDrawCursor() const override { return true; }
 	uint extraPixels() const override { return 1; }
-	const char *getName() const override { return "xbrz"; }
-	const char *getPrettyName() const override  { return "xBRZ"; }
 };
 
 xBRZPlugin::xBRZPlugin() {
@@ -100,8 +120,31 @@ xBRZPlugin::xBRZPlugin() {
 		_factors.push_back(i);
 }
 
-Scaler *xBRZPlugin::createInstance(const Graphics::PixelFormat &format) const {
-	return new xBRZScaler(format);
-}
+class xBRZ2Plugin final : public xBRZPlugin {
+	Scaler *createInstance(const Graphics::PixelFormat &format) const override { return new xBRZScaler(format, 2); }
+	const char *getName() const override { return "xbrz2"; }
+	const char *getPrettyName() const override  { return "xBRZ (2 threads)"; }
+};
 
-REGISTER_PLUGIN_STATIC(XBRZ, PLUGIN_TYPE_SCALER, xBRZPlugin);
+class xBRZ4Plugin final : public xBRZPlugin {
+	Scaler *createInstance(const Graphics::PixelFormat &format) const override { return new xBRZScaler(format, 4); }
+	const char *getName() const override { return "xbrz4"; }
+	const char *getPrettyName() const override  { return "xBRZ (4 threads)"; }
+};
+
+class xBRZ6Plugin final : public xBRZPlugin {
+	Scaler *createInstance(const Graphics::PixelFormat &format) const override { return new xBRZScaler(format, 6); }
+	const char *getName() const override { return "xbrz6"; }
+	const char *getPrettyName() const override  { return "xBRZ (6 threads)"; }
+};
+
+class xBRZ8Plugin final : public xBRZPlugin {
+	Scaler *createInstance(const Graphics::PixelFormat &format) const override { return new xBRZScaler(format, 8); }
+	const char *getName() const override { return "xbrz8"; }
+	const char *getPrettyName() const override  { return "xBRZ (8 threads)"; }
+};
+
+REGISTER_PLUGIN_STATIC(XBRZ2, PLUGIN_TYPE_SCALER, xBRZ2Plugin);
+REGISTER_PLUGIN_STATIC(XBRZ4, PLUGIN_TYPE_SCALER, xBRZ4Plugin);
+REGISTER_PLUGIN_STATIC(XBRZ6, PLUGIN_TYPE_SCALER, xBRZ6Plugin);
+REGISTER_PLUGIN_STATIC(XBRZ8, PLUGIN_TYPE_SCALER, xBRZ8Plugin);
