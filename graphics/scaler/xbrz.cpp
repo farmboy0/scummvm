@@ -25,6 +25,32 @@
 #include "graphics/scaler/xbrz.h"
 #include "graphics/scaler/xbrz/xbrz.h"
 
+xBRZScaler::xBRZScaler(const Graphics::PixelFormat &format, int nThreads)
+	: Scaler(format), _tpool(nThreads), _nThreads(nThreads), _CLUT16(nullptr) {
+
+	_factor = 1;
+	if (format.bytesPerPixel == 2) {
+		initLUT(format);
+	}
+}
+
+xBRZScaler::~xBRZScaler() {
+	delete[] _CLUT16;
+	_CLUT16 = nullptr;
+}
+
+void xBRZScaler::initLUT(const Graphics::PixelFormat &format) {
+	uint8 a, r, g, b;
+
+	_CLUT16 = new uint32[65536];
+
+	for (int color = 65535; color >= 0; --color) {
+		format.colorToARGB(color, a, r, g, b);
+		uint32 argb = (a << 24) | (r << 16) | (g << 8) | b;
+		_CLUT16[color] = argb;
+	}
+}
+
 void xBRZScaler::scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 							uint8 *dstPtr, uint32 dstPitch, int width, int height, int x, int y) {
 
@@ -33,16 +59,24 @@ void xBRZScaler::scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 	uint32_t *src = (uint32_t *)srcPtr;
 	uint32_t *dst = (uint32_t *)dstPtr;
 
+	// Make sure src is a rect with srcWidth == srcPitch and 32 bit color depth
 	int srcLineCount = height;
 	uint32 srcWidth = width;
 	uint32 srcWidthInByte = BytesPerPixel * srcWidth;
-	if (srcPitch > srcWidthInByte) {
+	if (srcPitch > srcWidthInByte || _format.bytesPerPixel == 2) {
 		src =  (uint32_t *)malloc(srcWidthInByte * srcLineCount);
 		uint32_t *tmp = src;
 		for (int i = 0; i < height; ++i) {
 			int lineOffset = i * srcPitch;
 			const uint8 *copyStart = srcPtr + lineOffset;
-			std::memcpy(tmp, copyStart, srcWidthInByte);
+			if (_format.bytesPerPixel == 2) {
+				for (uint32 j = 0; j < srcWidth; ++j) {
+					uint16 color = *(uint16 *)(copyStart + (j << 1));
+					*(tmp + j) = _CLUT16[color];
+				}
+			} else {
+				std::memcpy(tmp, copyStart, srcWidthInByte);
+			}
 			tmp += srcWidth;
 		}
 	}
@@ -50,7 +84,7 @@ void xBRZScaler::scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 	int dstLineCount = _factor * srcLineCount;
 	uint32 dstWidth = _factor * srcWidth;
 	uint32 dstWidthInByte = BytesPerPixel * dstWidth;
-	if (dstPitch > dstWidthInByte) {
+	if (dstPitch > dstWidthInByte || _format.bytesPerPixel == 2) {
 		dst = (uint32_t *)malloc(dstWidthInByte * dstLineCount);
 	}
 
@@ -78,18 +112,26 @@ void xBRZScaler::scaleIntern(const uint8 *srcPtr, uint32 srcPitch,
 				future.get();
 			});
 
-	if (dstPitch > dstWidthInByte) {
+	if (dstPitch > dstWidthInByte || _format.bytesPerPixel == 2) {
 		uint8 *tmp = dstPtr;
 		for (int i = 0; i < dstLineCount; ++i) {
 			int lineOffset = i * dstWidth;
 			const uint32 *copyStart = dst + lineOffset;
-			std::memcpy(tmp, copyStart, dstWidthInByte);
+			if (_format.bytesPerPixel == 2) {
+				for (uint32 j = 0; j < dstWidth; ++j) {
+					uint32 argb = *(copyStart + j);
+					uint16 color = _format.ARGBToColor(argb >> 24, argb >> 16, argb >> 8, argb);
+					*(uint16 *)(tmp + (j << 1)) = color;
+				}
+			} else {
+				std::memcpy(tmp, copyStart, dstWidthInByte);
+			}
 			tmp += dstPitch;
 		}
 		free(dst);
 	}
 
-	if (srcPitch > srcWidthInByte) {
+	if (srcPitch > srcWidthInByte || _format.bytesPerPixel == 2) {
 		free(src);
 	}
 }
