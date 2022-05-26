@@ -21,6 +21,8 @@
 #ifndef GRAPHICS_SCALER_XBRZ_H
 #define GRAPHICS_SCALER_XBRZ_H
 
+#include "graphics/scalerplugin.h"
+
 #define FORBIDDEN_SYMBOL_EXCEPTION_asctime
 #define FORBIDDEN_SYMBOL_EXCEPTION_clock
 #define FORBIDDEN_SYMBOL_EXCEPTION_ctime
@@ -31,16 +33,12 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_mktime
 #define FORBIDDEN_SYMBOL_EXCEPTION_time
 #define FORBIDDEN_SYMBOL_EXCEPTION_FILE
-
-#include "graphics/scalerplugin.h"
 #include "graphics/scaler/ctpl/ctpl_stl.h"
 
 class xBRZScaler : public Scaler {
 public:
-	xBRZScaler(const Graphics::PixelFormat &format, int nThreads) : Scaler(format), _tpool(nThreads), _nThreads(nThreads)
-	{
-		_factor = 1;
-	}
+	xBRZScaler(const Graphics::PixelFormat &format, int nThreads);
+	~xBRZScaler();
 	uint increaseFactor() override;
 	uint decreaseFactor() override;
 protected:
@@ -49,6 +47,9 @@ protected:
 private:
 	ctpl::thread_pool _tpool;
 	int _nThreads;
+	uint32 *_CLUT16;
+
+	void initLUT(const Graphics::PixelFormat &format);
 };
 
 
